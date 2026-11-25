@@ -1,0 +1,41 @@
+name: Build Vira
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install SDK and NDK
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018"
+
+      - name: Rebrand Vira
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        run: |
+          B=TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
+          sed -i -E "s/APP_ID = [0-9]+;/APP_ID = ${TG_API_ID};/" $B
+          sed -i -E "s/APP_HASH = \"[^\"]*\";/APP_HASH = \"${TG_API_HASH}\";/" $B
+          sed -i -E 's#(name="AppName">)[^<]*#\1ویرا#' TMessagesProj/src/main/res/values/strings.xml
+          sed -i -E 's/applicationId "[^"]*"/applicationId "com.vira.messenger"/' TMessagesProj_App/build.gradle
+          find . -name google-services.json -exec sed -i -E 's/org\.telegram\.messenger[a-z.]*/com.vira.messenger/g' {} +
+
+      - name: Build APK
+        run: ./gradlew :TMessagesProj_App:assembleAfatRelease --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Vira-APK
+          path: "**/*.apk"
