@@ -25,17 +25,23 @@ jobs:
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
         run: |
+          ID=$(printf '%s' "$TG_API_ID" | tr -dc '0-9')
+          HASH=$(printf '%s' "$TG_API_HASH" | tr -dc 'A-Za-z0-9')
+          echo "id length: ${#ID}, hash length: ${#HASH}"
+          if [ ${#ID} -lt 5 ] || [ ${#HASH} -ne 32 ]; then
+            echo "ERROR: secrets look wrong. Re-save TG_API_ID (digits only) and TG_API_HASH (32 chars)."
+            exit 1
+          fi
           B=TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
-          sed -i -E "s/APP_ID = [0-9]+;/APP_ID = ${TG_API_ID};/" $B
-          sed -i -E "s/APP_HASH = \"[^\"]*\";/APP_HASH = \"${TG_API_HASH}\";/" $B
+          sed -i -E "s/APP_ID = [^;]+;/APP_ID = ${ID};/" $B
+          sed -i -E "s/APP_HASH = \"[^\"]*\";/APP_HASH = \"${HASH}\";/" $B
           sed -i -E 's#(name="AppName">)[^<]*#\1ویرا#' TMessagesProj/src/main/res/values/strings.xml
           sed -i -E 's/^APP_PACKAGE[[:space:]]*=.*/APP_PACKAGE=com.vira.messenger/' gradle.properties
           find . -name "build.gradle*" -exec sed -i -E "s/(applicationId[[:space:]]*=?[[:space:]]*)[\"'][^\"']*[\"']/\1\"com.vira.messenger\"/" {} +
           find . -name google-services.json -exec sed -i -E 's/org\.telegram\.messenger[a-z.]*/com.vira.messenger/g' {} +
           echo "--- package check ---"
           grep -n "APP_PACKAGE" gradle.properties || true
-          grep -rn "applicationId" --include="build.gradle*" . || true
-          grep -rn "package_name" --include="google-services.json" . || true
+          grep -n "APP_ID" $B | sed -E 's/[0-9]{5,}/<number>/' || true
 
       - name: Build APK
         run: ./gradlew :TMessagesProj_App:assembleAfatRelease --no-daemon
