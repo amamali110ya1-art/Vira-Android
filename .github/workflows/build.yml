@@ -22,14 +22,13 @@ jobs:
 
       - name: Rebrand Vira
         env:
-          TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
         run: |
-          ID=$(printf '%s' "$TG_API_ID" | tr -dc '0-9')
+          ID=39785520
           HASH=$(printf '%s' "$TG_API_HASH" | tr -dc 'A-Za-z0-9')
           echo "id length: ${#ID}, hash length: ${#HASH}"
-          if [ ${#ID} -lt 5 ] || [ ${#HASH} -ne 32 ]; then
-            echo "ERROR: secrets look wrong. Re-save TG_API_ID (digits only) and TG_API_HASH (32 chars)."
+          if [ ${#HASH} -ne 32 ]; then
+            echo "ERROR: TG_API_HASH must be exactly 32 characters. Re-save it from my.telegram.org."
             exit 1
           fi
           B=TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
@@ -41,7 +40,7 @@ jobs:
           find . -name google-services.json -exec sed -i -E 's/org\.telegram\.messenger[a-z.]*/com.vira.messenger/g' {} +
           echo "--- package check ---"
           grep -n "APP_PACKAGE" gradle.properties || true
-          grep -n "APP_ID" $B | sed -E 's/[0-9]{5,}/<number>/' || true
+          grep -n "APP_ID" $B || true
 
       - name: Build APK
         run: ./gradlew :TMessagesProj_App:assembleAfatRelease --no-daemon
