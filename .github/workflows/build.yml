@@ -28,22 +28,41 @@ jobs:
           HASH=$(printf '%s' "$TG_API_HASH" | tr -dc 'A-Za-z0-9')
           echo "id length: ${#ID}, hash length: ${#HASH}"
           if [ ${#HASH} -ne 32 ]; then
-            echo "ERROR: TG_API_HASH must be exactly 32 characters. Re-save it from my.telegram.org."
+            echo "ERROR: TG_API_HASH must be exactly 32 characters."
             exit 1
           fi
           B=TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
-          sed -i -E "s/APP_ID = [^;]+;/APP_ID = ${ID};/" $B
-          sed -i -E "s/APP_HASH = \"[^\"]*\";/APP_HASH = \"${HASH}\";/" $B
+          echo "--- before ---"
+          grep -n "APP_ID\|APP_HASH" $B | sed -E 's/"[0-9a-f]{32}"/"<hash>"/'
+          sed -i -E "s/(static int APP_ID = )[^;]+;/\1${ID};/" $B
+          sed -i -E "s/(static String APP_HASH = )\"[^\"]*\";/\1\"${HASH}\";/" $B
           sed -i -E 's#(name="AppName">)[^<]*#\1ویرا#' TMessagesProj/src/main/res/values/strings.xml
           sed -i -E 's/^APP_PACKAGE[[:space:]]*=.*/APP_PACKAGE=com.vira.messenger/' gradle.properties
           find . -name "build.gradle*" -exec sed -i -E "s/(applicationId[[:space:]]*=?[[:space:]]*)[\"'][^\"']*[\"']/\1\"com.vira.messenger\"/" {} +
           find . -name google-services.json -exec sed -i -E 's/org\.telegram\.messenger[a-z.]*/com.vira.messenger/g' {} +
-          echo "--- package check ---"
+          echo "--- after ---"
+          grep -n "APP_ID\|APP_HASH" $B | sed -E 's/"[0-9a-f]{32}"/"<hash>"/'
           grep -n "APP_PACKAGE" gradle.properties || true
-          grep -n "APP_ID" $B || true
 
       - name: Build APK
-        run: ./gradlew :TMessagesProj_App:assembleAfatRelease --no-daemon
+        run: |
+          set +e
+          ./gradlew :TMessagesProj_App:assembleAfatRelease --no-daemon > build.log 2>&1
+          CODE=$?
+          if [ $CODE -ne 0 ]; then
+            MSG=$(grep -m1 -A8 'What went wrong' build.log | tr '\n' ' ')
+            echo "::error title=Gradle::${MSG}"
+            ERR=$(grep -m4 -B1 -A2 'error:' build.log | tr '\n' ' ')
+            echo "::error title=Compile::${ERR}"
+            grep -n -B2 -A6 'error:' build.log | head -60
+          fi
+          exit $CODE
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log
+          path: build.log
 
       - uses: actions/upload-artifact@v4
         with:
