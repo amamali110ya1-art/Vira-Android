@@ -29,8 +29,10 @@ jobs:
           sed -i -E "s/APP_ID = [0-9]+;/APP_ID = ${TG_API_ID};/" $B
           sed -i -E "s/APP_HASH = \"[^\"]*\";/APP_HASH = \"${TG_API_HASH}\";/" $B
           sed -i -E 's#(name="AppName">)[^<]*#\1ویرا#' TMessagesProj/src/main/res/values/strings.xml
-          sed -i -E 's/applicationId "[^"]*"/applicationId "com.vira.messenger"/' TMessagesProj_App/build.gradle
+          find . -name "build.gradle*" -exec sed -i -E "s/(applicationId[[:space:]]*=?[[:space:]]*)[\"'][^\"']*[\"']/\1\"com.vira.messenger\"/" {} +
           find . -name google-services.json -exec sed -i -E 's/org\.telegram\.messenger[a-z.]*/com.vira.messenger/g' {} +
+          echo "--- applicationId check ---"
+          grep -rn "applicationId" --include="build.gradle*" . || true
 
       - name: Build APK
         run: ./gradlew :TMessagesProj_App:assembleAfatRelease --no-daemon
